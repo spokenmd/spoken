@@ -31,7 +31,7 @@ def find_episode(query: str) -> dict:
         timeout=30,
     )
     resp.raise_for_status()
-    results = resp.json()
+    results = resp.json()["results"]
     if not results:
         sys.exit(f"No episodes found for {query!r}")
     return results[0]

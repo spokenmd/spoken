@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spoken-md"
+version = "0.1.0"
+description = "Podcast transcript API client: any published podcast episode as Markdown with real speaker names. Zero dependencies."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+authors = [{ name = "Spoken", email = "info@spoken.md" }]
+keywords = ["podcast", "transcript", "transcripts", "api", "markdown", "speaker", "llm", "rag", "agent"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Multimedia :: Sound/Audio :: Speech",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Text Processing :: Markup :: Markdown",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://spoken.md"
+Documentation = "https://spoken.md/agents.md"
+"API reference" = "https://spoken.md/podcast-transcript-api"
+Source = "https://github.com/spokenmd/spoken/tree/master/python"
+Changelog = "https://github.com/spokenmd/spoken/blob/master/python/CHANGELOG.md"
+
+[project.scripts]
+spoken-md = "spoken_md.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/spoken_md"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/spoken_md", "tests", "README.md", "LICENSE", "CHANGELOG.md", "pyproject.toml"]

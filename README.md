@@ -54,6 +54,24 @@ Auth is the `x-api-key` header. Responses include `X-Credits-Remaining` and `X-C
 - [`examples/quickstart.sh`](./examples/quickstart.sh) — search → transcript in two curl calls
 - [`examples/archive-show.sh`](./examples/archive-show.sh) — archive a show's entire back catalogue, one file per episode
 
+## Use from Python
+
+The [`spoken-md`](./python) package wraps the API with no dependencies outside the standard library, and installs a `spoken-md` command.
+
+```sh
+pip install spoken-md
+```
+
+```python
+from spoken_md import Spoken
+
+spoken = Spoken()                                  # SPOKEN_API_KEY, or the demo key
+episode = spoken.search("huberman sleep")[0]
+print(spoken.transcript(episode.id))               # Markdown with real speaker names
+```
+
+`archive(podcast_id, skip=...)` walks a whole show and is resumable; errors are typed by status (`PaymentRequired` carries the top-up URL, `NotFound` means no transcript). See [python/README.md](./python/README.md).
+
 ## Use as an MCP server
 
 This repo includes **`spoken-mcp`**, a [Model Context Protocol](https://modelcontextprotocol.io) server that exposes Spoken to MCP-compatible agents (Claude Desktop, Cursor, Cline, …). It provides four tools:
