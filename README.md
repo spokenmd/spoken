@@ -1,6 +1,6 @@
-# Spoken — podcast transcripts as clean Markdown, built for AI agents
+# Spoken — podcast transcript API and MCP server, clean Markdown with real speaker names
 
-[Spoken](https://spoken.md) is a transcript API that turns any published podcast into clean Markdown with **real speaker names** — not "Speaker 1." One API call returns named, timestamped text, ready for LLMs, RAG pipelines, summarizers, and search.
+[Spoken](https://spoken.md) is a transcript API that turns any published podcast into clean Markdown with **real speaker names** — not "Speaker 1." One API call returns named, timestamped text, ready for LLMs, RAG pipelines, summarizers, and search. This repo also ships `spoken-mcp`, an MCP server that gives Claude Desktop, Claude Code, Cursor and Cline the same transcripts as tools — see [Use as an MCP server](#use-as-an-mcp-server).
 
 It's a transcript *retrieval* API, not a speech-to-text service: it works on already-published podcasts, so you skip uploading audio, running diarization, and mapping anonymous speaker labels by hand. For published shows that's typically **5–10× cheaper** than running the audio through a transcription service.
 
