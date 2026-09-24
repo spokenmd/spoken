@@ -312,7 +312,7 @@ server.registerTool(
   {
     title: "List new episodes on followed shows",
     description:
-      "What is new on the shows this key follows: for each show, the episodes released in the last 90 days that are newer than the newest one already fetched from it (up to 10 per show), each with a transcript_url. Episodes with no transcript are left out. Fetch any with get_transcript (1 credit each on first fetch); a fetch raises that show's floor, so the next call lists only what came after. Refreshed every 15 minutes, so a show followed moments ago may be empty until its first poll. Does not consume credits.",
+      "What is new on the shows this key follows: for each show, the episodes released in the last 90 days that are newer than the newest one already fetched from it (up to 10 per show), each with a transcript_url. Episodes with no transcript are left out. Fetch any with get_transcript (1 credit each on first fetch); a fetch raises that show's floor, so the next call lists only what came after. Refreshed hourly, so a show followed moments ago may be empty until its first poll. Does not consume credits.",
     inputSchema: {},
   },
   async (): Promise<TextResult> => {
