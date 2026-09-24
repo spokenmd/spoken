@@ -17,6 +17,10 @@ from .client import (
     Balance,
     Episode,
     EpisodeRef,
+    Follow,
+    Following,
+    NewEpisode,
+    NewShow,
     NotFound,
     PaymentRequired,
     Show,
@@ -25,9 +29,10 @@ from .client import (
     Throttled,
     Transcript,
     UpstreamError,
+    WhatsNew,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "ArchiveItem",
@@ -37,6 +42,10 @@ __all__ = [
     "DEMO_KEY",
     "Episode",
     "EpisodeRef",
+    "Follow",
+    "Following",
+    "NewEpisode",
+    "NewShow",
     "NotFound",
     "PaymentRequired",
     "Show",
@@ -45,5 +54,6 @@ __all__ = [
     "Throttled",
     "Transcript",
     "UpstreamError",
+    "WhatsNew",
     "__version__",
 ]

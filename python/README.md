@@ -71,7 +71,25 @@ spoken-md episodes 1050462261                # every fetchable episode of a show
 spoken-md transcript 1000625088063 > costco.md
 spoken-md archive 1050462261 -o acquired/    # one .md per episode, resumable
 spoken-md balance
+spoken-md following                          # the shows this key is kept current on
+spoken-md follow 1050462261                  # declare a follow, or clear a mute
+spoken-md new                                # unfetched episodes on those shows: id, date, show, title
 ```
+
+## Keeping a folder current
+
+Every charged fetch makes its show a follow, and `new()` lists what those shows have published
+that you have not fetched. A scheduled run of this is the whole job:
+
+```python
+inbox = Path("inbox")
+for episode in spoken.new():                  # newest first, across every followed show
+    (inbox / f"{episode.id}.md").write_text(spoken.transcript(episode.id).markdown)
+```
+
+Each fetch raises that show's floor, so the next run lists only what came after. Shows you
+never fetched from can be declared with `spoken.follow(podcast_id)`; `spoken.unfollow()` mutes
+one so later fetches do not re-add it.
 
 ## Errors
 
@@ -106,7 +124,10 @@ except PaymentRequired as e:
 (1 on a first fetch, 0 on a repeat), and `.top_up_url` when the balance is low. `str()` on it is
 the Markdown. `search()` returns `Episode` objects with `id`, `title`, `podcast`, `podcast_id`
 and `date`. `episodes()` returns a `Show` you can iterate. `balance()` returns credits, the
-attached email and recent usage.
+attached email and recent usage. `following()` returns `Follow` objects (`podcast_id`, `podcast`,
+`source`, `fetch_count`, `newest_fetched_id`) plus the muted shows and the limits; `new()` returns
+a `WhatsNew` you can iterate for `NewEpisode` objects (`id`, `title`, `date`, `transcript_url`),
+with `.shows` keeping them grouped.
 
 ## When Spoken is the wrong tool
 

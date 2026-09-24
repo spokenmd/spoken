@@ -42,6 +42,47 @@ interface EpisodesResponse {
   episodes: EpisodeRef[];
 }
 
+interface Follow {
+  podcast_id: string;
+  podcast: string;
+  source: "fetch" | "explicit";
+  fetch_count: number;
+  last_fetched_at?: string;
+  newest_fetched_id?: string;
+}
+
+interface FollowingResponse {
+  following: Follow[];
+  muted: Array<{ podcast_id: string; podcast: string }>;
+  limits: { explicit: number; inferred: number; inferred_window_days: number };
+}
+
+interface FollowChange {
+  podcast_id: string;
+  podcast: string;
+  state: "following" | "muted";
+}
+
+interface NewEpisode {
+  id: string;
+  title: string;
+  date: string;
+  transcript_url: string;
+}
+
+interface NewShow {
+  podcast_id: string;
+  podcast: string;
+  source: "fetch" | "explicit";
+  episodes: NewEpisode[];
+}
+
+interface NewResponse {
+  as_of: string;
+  count: number;
+  shows: NewShow[];
+}
+
 interface ApiError {
   error?: { code?: string; message?: string };
 }
@@ -91,7 +132,7 @@ async function describeError(res: Response): Promise<string> {
   return `${res.status} ${res.statusText}. ${hints[res.status] ?? ""} ${detail}`.trim();
 }
 
-const server = new McpServer({ name: "spoken", version: "0.2.2" });
+const server = new McpServer({ name: "spoken", version: "0.3.0" });
 
 server.registerTool(
   "search_podcasts",
@@ -189,6 +230,111 @@ server.registerTool(
     if (!res.ok) return text(await describeError(res), true);
     const body = await res.json();
     return text(JSON.stringify(body, null, 2));
+  },
+);
+
+server.registerTool(
+  "list_following",
+  {
+    title: "List followed shows",
+    description:
+      "The shows this key is kept current on. Every charged fetch makes its show a follow: the five most-fetched shows from the last 180 days are followed automatically (source 'fetch'), and up to 25 more can be declared with follow_podcast (source 'explicit'). Muted shows are listed separately. Use list_new_episodes to see what is new on them. Does not consume credits; the demo key has nothing to follow with.",
+    inputSchema: {},
+  },
+  async (): Promise<TextResult> => {
+    const res = await spokenFetch(`/following`);
+    if (!res.ok) return text(await describeError(res), true);
+    const data = (await res.json()) as FollowingResponse;
+    const lines = data.following.map(
+      (f) =>
+        `- ${f.podcast} · podcast_id: ${f.podcast_id} · ${f.source === "explicit" ? "declared" : "from your fetches"}` +
+        ` · ${f.fetch_count} fetched` +
+        (f.newest_fetched_id ? ` · newest fetched: ${f.newest_fetched_id}` : ""),
+    );
+    const muted = data.muted.map((m) => `- ${m.podcast} · podcast_id: ${m.podcast_id}`);
+    const parts = [
+      data.following.length === 0
+        ? "Following no shows yet. Fetch a transcript, or declare one with follow_podcast."
+        : `Following ${data.following.length} show(s) (up to ${data.limits.explicit} declared, ${data.limits.inferred} automatic):\n${lines.join("\n")}`,
+    ];
+    if (muted.length > 0) parts.push(`Muted (unfollow_podcast; follow_podcast reverses it):\n${muted.join("\n")}`);
+    return text(parts.join("\n\n"));
+  },
+);
+
+server.registerTool(
+  "follow_podcast",
+  {
+    title: "Follow a show",
+    description:
+      "Declare a follow for a show, or clear a mute. Pass a podcast_id from search_podcasts. A declared follow stays until unfollow_podcast, regardless of fetch activity, and does not use one of the five automatic slots. For a show never fetched, what counts as new starts from its newest episode now. Does not consume credits.",
+    inputSchema: {
+      podcast_id: z.string().min(1).describe("Show id (the podcast_id field from a search_podcasts result)."),
+    },
+  },
+  async ({ podcast_id }): Promise<TextResult> => {
+    const res = await spokenFetch(`/following/${encodeURIComponent(podcast_id)}`, { method: "PUT" });
+    if (!res.ok) {
+      if (res.status === 409) {
+        return text("409 — declared-follow limit reached. Unfollow a show with unfollow_podcast first.", true);
+      }
+      if (res.status === 404) return text(`404 — no podcast with id ${podcast_id}.`, true);
+      return text(await describeError(res), true);
+    }
+    const data = (await res.json()) as FollowChange;
+    return text(`Now following ${data.podcast} (podcast_id ${data.podcast_id}). list_new_episodes will show its new episodes.`);
+  },
+);
+
+server.registerTool(
+  "unfollow_podcast",
+  {
+    title: "Stop following a show",
+    description:
+      "Mute a show: it leaves the followed list and later fetches do not re-add it. follow_podcast reverses it. Pass a podcast_id from list_following. Does not consume credits.",
+    inputSchema: {
+      podcast_id: z.string().min(1).describe("Show id, from list_following or search_podcasts."),
+    },
+  },
+  async ({ podcast_id }): Promise<TextResult> => {
+    const res = await spokenFetch(`/following/${encodeURIComponent(podcast_id)}`, { method: "DELETE" });
+    if (!res.ok) {
+      if (res.status === 404) return text(`404 — not following podcast id ${podcast_id}.`, true);
+      return text(await describeError(res), true);
+    }
+    const data = (await res.json()) as FollowChange;
+    return text(`Muted ${data.podcast} (podcast_id ${data.podcast_id}). follow_podcast reverses it.`);
+  },
+);
+
+server.registerTool(
+  "list_new_episodes",
+  {
+    title: "List new episodes on followed shows",
+    description:
+      "What is new on the shows this key follows: for each show, the episodes released in the last 90 days that are newer than the newest one already fetched from it (up to 10 per show), each with a transcript_url. Episodes with no transcript are left out. Fetch any with get_transcript (1 credit each on first fetch); a fetch raises that show's floor, so the next call lists only what came after. Refreshed every 15 minutes, so a show followed moments ago may be empty until its first poll. Does not consume credits.",
+    inputSchema: {},
+  },
+  async (): Promise<TextResult> => {
+    const res = await spokenFetch(`/new`);
+    if (!res.ok) return text(await describeError(res), true);
+    const data = (await res.json()) as NewResponse;
+    if (data.shows.length === 0) {
+      return text("Following no shows yet. Fetch a transcript, or declare one with follow_podcast.");
+    }
+    if (data.count === 0) {
+      return text(`Nothing new on the ${data.shows.length} show(s) you follow as of ${data.as_of}.`);
+    }
+    const blocks = data.shows
+      .filter((s) => s.episodes.length > 0)
+      .map(
+        (s) =>
+          `${s.podcast} (podcast_id ${s.podcast_id}):\n` +
+          s.episodes.map((e) => `- ${e.title} (${e.date}) · id: ${e.id}`).join("\n"),
+      );
+    return text(
+      `${data.count} new episode(s) across ${blocks.length} show(s), as of ${data.as_of}. Fetch any with get_transcript (1 credit each on first fetch).\n\n${blocks.join("\n\n")}`,
+    );
   },
 );
 

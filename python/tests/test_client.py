@@ -62,6 +62,21 @@ class FakeSpoken(BaseHTTPRequestHandler):
                 return self._json(401, {"error": {"code": "unauthorized", "message": "Demo key has no balance"}})
             return self._json(200, {"credits": 42, "email": "a@b.c", "top_up": {"url": "https://spoken.md/top-up?key=" + key},
                                     "usage": {"total": 7, "recent": []}})
+        if url.path == "/following":
+            if key == "pt_demo":
+                return self._json(401, {"error": {"code": "unauthorized", "message": "Invalid API key."}})
+            return self._json(200, {
+                "following": [{"podcast_id": SHOW, "podcast": "A Show", "source": "fetch", "fetch_count": 3,
+                               "last_fetched_at": "2026-09-20T00:00:00Z", "newest_fetched_id": "2"}],
+                "muted": [{"podcast_id": "999", "podcast": "Muted Show"}],
+                "limits": {"explicit": 25, "inferred": 5, "inferred_window_days": 180},
+            })
+        if url.path == "/new":
+            return self._json(200, {"as_of": "2026-09-24T12:00:00Z", "count": 1, "shows": [
+                {"podcast_id": SHOW, "podcast": "A Show", "source": "fetch", "episodes": [
+                    {"id": "3", "title": "Three", "date": "2026-01-15T00:00:00Z", "transcript_url": "https://spoken.md/transcripts/3"}]},
+                {"podcast_id": "555", "podcast": "Quiet Show", "source": "explicit", "episodes": []},
+            ]})
         if url.path.startswith("/transcripts/"):
             episode_id = url.path.rsplit("/", 1)[1]
             if episode_id == "flaky":
@@ -87,6 +102,21 @@ class FakeSpoken(BaseHTTPRequestHandler):
                                                   "top_up_url": "https://spoken.md/top-up?key=pt_broke"}})
             return self._markdown(f"**Host** (0:00)\nEpisode {episode_id}.\n", remaining=41, charged=1)
         self._json(404, {"error": {"code": "not_found", "message": "No such route"}})
+
+    def do_PUT(self):  # noqa: N802
+        FakeSpoken.seen_headers.append({k.lower(): v for k, v in self.headers.items()})
+        podcast_id = self.path.rsplit("/", 1)[1]
+        if podcast_id == "nope":
+            return self._json(404, {"error": {"code": "not_found", "message": "No podcast found for that id."}})
+        if podcast_id == "full":
+            return self._json(409, {"error": {"code": "follow_limit", "message": "You can follow up to 25 shows.", "limit": 25}})
+        return self._json(200, {"podcast_id": podcast_id, "podcast": "A Show", "state": "following", "source": "explicit"})
+
+    def do_DELETE(self):  # noqa: N802
+        podcast_id = self.path.rsplit("/", 1)[1]
+        if podcast_id == "nope":
+            return self._json(404, {"error": {"code": "not_following", "message": "You are not following that show."}})
+        return self._json(200, {"podcast_id": podcast_id, "podcast": "A Show", "state": "muted"})
 
     def _json(self, status, body):
         raw = json.dumps(body).encode()
@@ -190,6 +220,35 @@ class ClientTests(unittest.TestCase):
         with self.assertRaises(AuthError):
             self.client("pt_demo").balance()
 
+    def test_following_is_typed_and_iterable(self):
+        f = self.client().following()
+        self.assertEqual(len(f), 1)
+        self.assertEqual([x.podcast_id for x in f], [SHOW])
+        self.assertEqual(f.following[0].newest_fetched_id, "2")
+        self.assertEqual(f.muted, [{"podcast_id": "999", "podcast": "Muted Show"}])
+        self.assertEqual(f.limits["explicit"], 25)
+        with self.assertRaises(AuthError):
+            self.client("pt_demo").following()
+
+    def test_follow_and_unfollow_use_put_and_delete(self):
+        f = self.client().follow(SHOW)
+        self.assertEqual((f.podcast_id, f.source), (SHOW, "explicit"))
+        self.assertIsNone(self.client().unfollow(SHOW))
+        with self.assertRaises(NotFound):
+            self.client().follow("nope")
+        with self.assertRaises(NotFound):
+            self.client().unfollow("nope")
+        with self.assertRaises(SpokenError) as raised:
+            self.client().follow("full")
+        self.assertEqual(raised.exception.status, 409)
+
+    def test_new_iterates_episodes_across_shows(self):
+        new = self.client().new()
+        self.assertEqual(len(new), 1)
+        self.assertEqual([s.podcast for s in new.shows], ["A Show", "Quiet Show"])
+        episodes = list(new)
+        self.assertEqual(episodes[0].transcript_url, "https://spoken.md/transcripts/3")
+
     def test_archive_skips_held_ids_and_yields_none_on_404(self):
         seen = []
         items = list(self.client().archive(SHOW, skip={"1"}, pace=0, on_error=lambda e, err: seen.append(e.id)))
@@ -265,6 +324,28 @@ class CliTests(unittest.TestCase):
         code, _, err = self.run_cli("transcript", "1", key="pt_broke")
         self.assertEqual(code, 3)
         self.assertIn("POST https://spoken.md/top-up?key=pt_broke", err)
+
+    def test_following_and_new_print_tab_separated_lines(self):
+        code, out, _ = self.run_cli("following")
+        self.assertEqual(code, 0)
+        self.assertIn(f"{SHOW}\tfetch\t3\tA Show", out)
+        self.assertIn("999\tmuted\t-\tMuted Show", out)
+        code, out, _ = self.run_cli("new")
+        self.assertEqual(code, 0)
+        self.assertEqual(out.strip(), "3\t2026-01-15\tA Show\tThree")
+        code, out, _ = self.run_cli("new", "--json")
+        self.assertEqual(json.loads(out)["count"], 1)
+
+    def test_follow_and_unfollow_report_on_stderr(self):
+        code, out, err = self.run_cli("follow", SHOW)
+        self.assertEqual((code, out), (0, ""))
+        self.assertIn("following A Show", err)
+        code, _, err = self.run_cli("unfollow", SHOW)
+        self.assertEqual(code, 0)
+        self.assertIn("muted", err)
+        code, _, err = self.run_cli("follow", "nope")
+        self.assertEqual(code, 1)
+        self.assertIn("No podcast", err)
 
     def test_no_command_prints_help(self):
         code, out, _ = self.run_cli()

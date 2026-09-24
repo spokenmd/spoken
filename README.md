@@ -74,7 +74,7 @@ print(spoken.transcript(episode.id))               # Markdown with real speaker 
 
 ## Use as an MCP server
 
-This repo includes **`spoken-mcp`**, a [Model Context Protocol](https://modelcontextprotocol.io) server that exposes Spoken to MCP-compatible agents (Claude Desktop, Cursor, Cline, …). It provides four tools:
+This repo includes **`spoken-mcp`**, a [Model Context Protocol](https://modelcontextprotocol.io) server that exposes Spoken to MCP-compatible agents (Claude Desktop, Cursor, Cline, …). It provides eight tools:
 
 | Tool | Description |
 | --- | --- |
@@ -82,6 +82,12 @@ This repo includes **`spoken-mcp`**, a [Model Context Protocol](https://modelcon
 | `list_episodes` | List a show's entire back-catalog from a `podcast_id` |
 | `get_transcript` | Fetch an episode's transcript as Markdown with real speaker names |
 | `get_balance` | Check remaining credits |
+| `list_following` | The shows this key is kept current on, inferred from fetches or declared |
+| `follow_podcast` | Declare a follow for a show (or clear a mute) |
+| `unfollow_podcast` | Mute a show so it leaves the list and fetches do not re-add it |
+| `list_new_episodes` | New episodes on followed shows that have not been fetched yet, with transcript links |
+
+Keeping a knowledge base current is `list_new_episodes` on a schedule and `get_transcript` on what it lists: each fetch raises that show's floor.
 
 Add it to your MCP client config (e.g. Claude Desktop's `claude_desktop_config.json`):
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spoken-md"
-version = "0.1.0"
+version = "0.2.0"
 description = "Podcast transcript API client: any published podcast episode as Markdown with real speaker names. Zero dependencies."
 readme = "README.md"
 license = "MIT"

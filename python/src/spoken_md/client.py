@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Set
 
 DEFAULT_BASE_URL = "https://spoken.md"
 DEMO_KEY = "pt_demo"
-_VERSION = "0.1.0"
+_VERSION = "0.2.0"
 
 
 # --- Errors ---------------------------------------------------------------------------------
@@ -170,6 +170,92 @@ class Balance:
 
 
 @dataclass(frozen=True)
+class Follow:
+    """One show this key is kept current on. `source` is `fetch` when inferred from fetches or
+    `explicit` when declared with `follow()`. `newest_fetched_id` is the highest episode id fetched,
+    the floor for what `new()` counts as new; a backfill of old episodes does not move it."""
+
+    podcast_id: str
+    podcast: str
+    source: str
+    fetch_count: int
+    last_fetched_at: Optional[str]
+    newest_fetched_id: Optional[str]
+
+    @classmethod
+    def _from(cls, d: Dict[str, Any]) -> "Follow":
+        return cls(
+            podcast_id=str(d.get("podcast_id", "")),
+            podcast=str(d.get("podcast", "")),
+            source=str(d.get("source", "fetch")),
+            fetch_count=int(d.get("fetch_count", 0) or 0),
+            last_fetched_at=d.get("last_fetched_at") or None,
+            newest_fetched_id=d.get("newest_fetched_id") or None,
+        )
+
+
+@dataclass(frozen=True)
+class Following:
+    """`/following`: the active follows, the muted shows as `(podcast_id, podcast)` pairs, and the
+    limits (`explicit`, `inferred`, `inferred_window_days`)."""
+
+    following: List[Follow]
+    muted: List[Dict[str, str]]
+    limits: Dict[str, int]
+
+    def __iter__(self) -> Iterator[Follow]:
+        return iter(self.following)
+
+    def __len__(self) -> int:
+        return len(self.following)
+
+
+@dataclass(frozen=True)
+class NewEpisode:
+    """An episode on a followed show that has not been fetched yet."""
+
+    id: str
+    title: str
+    date: str
+    transcript_url: str
+
+    @classmethod
+    def _from(cls, d: Dict[str, Any]) -> "NewEpisode":
+        return cls(
+            id=str(d.get("id", "")),
+            title=str(d.get("title", "")),
+            date=str(d.get("date", "")),
+            transcript_url=str(d.get("transcript_url", "")),
+        )
+
+
+@dataclass(frozen=True)
+class NewShow:
+    podcast_id: str
+    podcast: str
+    source: str
+    episodes: List[NewEpisode]
+
+
+@dataclass(frozen=True)
+class WhatsNew:
+    """`/new`: every followed show with its unfetched episodes. Iterating yields the episodes
+    across all shows, newest first; `shows` keeps them grouped."""
+
+    as_of: str
+    count: int
+    shows: List[NewShow]
+
+    def __iter__(self) -> Iterator[NewEpisode]:
+        episodes = [e for s in self.shows for e in s.episodes]
+        episodes.sort(key=lambda e: e.id, reverse=True)
+        return iter(episodes)
+
+    def __len__(self) -> int:
+        return self.count
+
+
+@dataclass(frozen=True)
 class ArchiveItem:
     """One step of `Spoken.archive`: the episode and its transcript, or `None` when the fetch
     returned 404 (listed, but no transcript today)."""
@@ -248,6 +334,53 @@ class Spoken:
         email = raw.get("email")
         return Balance(credits=int(raw.get("credits", 0) or 0), email=email if isinstance(email, str) else None, raw=raw)
 
+    def following(self) -> Following:
+        """`GET /following`: the shows this key is kept current on. Every charged fetch makes its
+        show a follow (the five most-fetched from the last 180 days), and up to 25 more can be
+        declared with `follow()`. Free. The demo key gets a 401."""
+        data, _ = self._get_json("/following")
+        raw = data if isinstance(data, dict) else {}
+        limits = raw.get("limits")
+        return Following(
+            following=[Follow._from(f) for f in raw.get("following", []) if isinstance(f, dict)],
+            muted=[m for m in raw.get("muted", []) if isinstance(m, dict)],
+            limits={k: int(v) for k, v in limits.items()} if isinstance(limits, dict) else {},
+        )
+
+    def follow(self, podcast_id: str) -> Follow:
+        """`PUT /following/{podcast_id}`: declare a follow, or clear a mute. Raises `NotFound` for
+        an unknown show and `SpokenError(409)` at the declared-follow limit. Free."""
+        data, _ = self._get_json(f"/following/{urllib.parse.quote(podcast_id, safe='')}", method="PUT")
+        raw = data if isinstance(data, dict) else {}
+        return Follow._from({**raw, "source": "explicit"})
+
+    def unfollow(self, podcast_id: str) -> None:
+        """`DELETE /following/{podcast_id}`: mute a show, so it leaves the list and later fetches
+        do not re-add it. `follow()` reverses it. Raises `NotFound` when not following it. Free."""
+        self._get_json(f"/following/{urllib.parse.quote(podcast_id, safe='')}", method="DELETE")
+
+    def new(self) -> WhatsNew:
+        """`GET /new`: on every followed show, the episodes released in the last 90 days that are
+        newer than the newest one fetched from it (10 per show at most), with a transcript URL each.
+        Episodes with no transcript are left out. Free; fetching one costs the normal credit.
+
+            for episode in spoken.new():
+                Path("inbox", f"{episode.id}.md").write_text(spoken.transcript(episode.id).markdown)
+        """
+        data, _ = self._get_json("/new")
+        raw = data if isinstance(data, dict) else {}
+        shows = [
+            NewShow(
+                podcast_id=str(s.get("podcast_id", "")),
+                podcast=str(s.get("podcast", "")),
+                source=str(s.get("source", "fetch")),
+                episodes=[NewEpisode._from(e) for e in s.get("episodes", []) if isinstance(e, dict)],
+            )
+            for s in raw.get("shows", [])
+            if isinstance(s, dict)
+        ]
+        return WhatsNew(as_of=str(raw.get("as_of", "")), count=int(raw.get("count", 0) or 0), shows=shows)
+
     def archive(
         self,
         podcast_id: str,
@@ -286,8 +419,10 @@ class Spoken:
 
     # -- transport --
 
-    def _get_json(self, path: str, params: Optional[Dict[str, str]] = None) -> "tuple[Any, Dict[str, str]]":
-        body, headers = self._request(path, params=params, accept="application/json")
+    def _get_json(
+        self, path: str, params: Optional[Dict[str, str]] = None, *, method: str = "GET"
+    ) -> "tuple[Any, Dict[str, str]]":
+        body, headers = self._request(path, params=params, accept="application/json", method=method)
         try:
             return json.loads(body), headers
         except ValueError:
@@ -299,6 +434,7 @@ class Spoken:
         *,
         params: Optional[Dict[str, str]] = None,
         accept: str = "*/*",
+        method: str = "GET",
     ) -> "tuple[str, Dict[str, str]]":
         url = self.base_url + path
         if params:
@@ -306,7 +442,7 @@ class Spoken:
         headers = {"x-api-key": self.api_key, "Accept": accept, "User-Agent": self.user_agent}
         attempt = 0
         while True:
-            request = urllib.request.Request(url, headers=headers, method="GET")
+            request = urllib.request.Request(url, headers=headers, method=method)
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
                     return _decode(response.read()), _headers(response.headers)
