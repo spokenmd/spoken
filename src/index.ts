@@ -132,7 +132,7 @@ async function describeError(res: Response): Promise<string> {
   return `${res.status} ${res.statusText}. ${hints[res.status] ?? ""} ${detail}`.trim();
 }
 
-const server = new McpServer({ name: "spoken", version: "0.3.0" });
+const server = new McpServer({ name: "spoken", version: "0.3.1" });
 
 server.registerTool(
   "search_podcasts",
