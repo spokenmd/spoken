@@ -93,13 +93,15 @@ Keeping a knowledge base current is `list_new_episodes` on a schedule and `get_t
 
 ### Hosted
 
-Nothing to install. Point a client that connects to a URL at `https://spoken.md/mcp` (Streamable HTTP) and send your key as a header:
+Nothing to install. Point a client that connects to a URL at `https://spoken.md/mcp` (Streamable HTTP):
 
 ```sh
-claude mcp add --transport http spoken https://spoken.md/mcp --header "Authorization: Bearer pt_your_key"
+claude mcp add --transport http spoken https://spoken.md/mcp
 ```
 
-A client that can only sign in with OAuth, such as a ChatGPT connector, is sent to a page where you paste your key once. With no key at all, searching, listing a show and the demo episode work.
+The client asks you to sign in the first time a tool needs your key. To skip that, send the key as a header yourself: `Authorization: Bearer pt_your_key`.
+
+A client that can only sign in with OAuth, such as ChatGPT in developer mode, is sent to a page where you paste your key once. Steps for each app: [spoken.md/mcp-server](https://spoken.md/mcp-server). With no key at all, searching, listing a show and the demo episode work.
 
 ### Local
 
