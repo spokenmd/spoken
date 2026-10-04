@@ -3,17 +3,31 @@
   "name": "io.github.spokenmd/spoken",
   "title": "Spoken",
   "description": "Podcast transcripts as clean Markdown with real speaker names — via the Spoken API.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "websiteUrl": "https://spoken.md",
   "repository": {
     "url": "https://github.com/spokenmd/spoken",
     "source": "github"
   },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://spoken.md/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer followed by an API key from spoken.md (Bearer pt_...). Optional: without it only the free tools work, and a client that supports OAuth is asked to sign in.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
       "identifier": "spoken-mcp",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "transport": {
         "type": "stdio"
       },

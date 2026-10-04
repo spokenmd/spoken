@@ -76,7 +76,7 @@ print(spoken.transcript(episode.id))               # Markdown with real speaker 
 
 ## Use as an MCP server
 
-This repo includes **`spoken-mcp`**, a [Model Context Protocol](https://modelcontextprotocol.io) server that exposes Spoken to MCP-compatible agents (Claude Desktop, Cursor, Cline, …). It provides eight tools:
+Spoken is a [Model Context Protocol](https://modelcontextprotocol.io) server two ways: hosted at `https://spoken.md/mcp`, and as **`spoken-mcp`**, the package in this repo, for clients that run a server locally (Claude Desktop, Cursor, Cline, …). Both provide the same eight tools:
 
 | Tool | Description |
 | --- | --- |
@@ -90,6 +90,18 @@ This repo includes **`spoken-mcp`**, a [Model Context Protocol](https://modelcon
 | `list_new_episodes` | New episodes on followed shows that have not been fetched yet, with transcript links |
 
 Keeping a knowledge base current is `list_new_episodes` on a schedule and `get_transcript` on what it lists: each fetch raises that show's floor.
+
+### Hosted
+
+Nothing to install. Point a client that connects to a URL at `https://spoken.md/mcp` (Streamable HTTP) and send your key as a header:
+
+```sh
+claude mcp add --transport http spoken https://spoken.md/mcp --header "Authorization: Bearer pt_your_key"
+```
+
+A client that can only sign in with OAuth, such as a ChatGPT connector, is sent to a page where you paste your key once. With no key at all, searching, listing a show and the demo episode work.
+
+### Local
 
 Add it to your MCP client config (e.g. Claude Desktop's `claude_desktop_config.json`):
 
