@@ -1,6 +1,6 @@
 {
   "name": "spoken-mcp",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "mcpName": "io.github.spokenmd/spoken",
   "description": "MCP server for Spoken — fetch podcast transcripts as clean Markdown with real speaker names. Built for AI agents.",
   "type": "module",

@@ -15,7 +15,7 @@ import {
 } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
-export const VERSION = "0.4.2";
+export const VERSION = "0.4.3";
 
 export interface SpokenServerOptions {
   /** A Spoken API key (`pt_...`). Omitted: the free `pt_demo` key, which searches fully but only fetches the demo episode. */
@@ -218,7 +218,9 @@ function tool<Input extends z.ZodObject, Out extends Structured = Structured>(
       // for a type parameter; the handler takes exactly what that conditional resolves to.
       server.registerTool(
         name,
-        { title, description, inputSchema, outputSchema, annotations },
+        // The title goes out twice, from the one definition: the tool's own `title`, and
+        // `annotations.title`, which is where a directory's listing reads it from.
+        { title, description, inputSchema, outputSchema, annotations: { title, ...annotations } },
         handler as unknown as ToolCallback<Input>,
       );
     },

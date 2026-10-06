@@ -3,7 +3,7 @@
   "name": "io.github.spokenmd/spoken",
   "title": "Spoken",
   "description": "Podcast transcripts as clean Markdown with real speaker names — via the Spoken API.",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "websiteUrl": "https://spoken.md",
   "repository": {
     "url": "https://github.com/spokenmd/spoken",
@@ -27,7 +27,7 @@
     {
       "registryType": "npm",
       "identifier": "spoken-mcp",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "transport": {
         "type": "stdio"
       },
